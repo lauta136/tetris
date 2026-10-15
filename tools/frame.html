@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>frame</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; }
+  iframe { border: 0; display: block; position: absolute; top: 0; left: 0; }
+</style>
+<script type="module">
+/* Renders index.html inside an iframe of an exact device size, so a headless
+   screenshot shows the real thing at that viewport. Chrome's own --window-size
+   is ignored for layout in headless mode, but an iframe gets a true viewport. */
+const p = new URLSearchParams(location.search);
+const W = parseInt(p.get('w') || '390', 10);
+const H = parseInt(p.get('h') || '844', 10);
+
+const f = document.createElement('iframe');
+f.width = W;
+f.height = H;
+f.src = '../index.html?debug=1';
+document.body.appendChild(f);
+
+f.addEventListener('load', () => {
+  const win = f.contentWindow;
+  const T = win.__tetris;
+  if (!T) return;
+
+  // freeze the game loop so our staged board survives to the screenshot
+  win.requestAnimationFrame = () => 0;
+
+  T.start();
+  const blank = () => Array.from({ length: T.TOTAL_ROWS }, () => new Array(T.COLS).fill(0));
+  T.setBoard(blank());
+
+  const paint = (rows) => rows.forEach(([r, cs, t]) => cs.forEach((c) => { T.board[r][c] = t; }));
+  paint([
+    [21, [0,1,2,3,5,6,7,8,9], 'J'],
+    [20, [0,1,2,3,4,6,7,8,9], 'L'],
+    [19, [0,1,3,4,5,6,7,8,9], 'S'],
+    [18, [0,1,2,3,4,6,7,8,9], 'Z'],
+    [17, [0,2,3,4,5,6,7,9], 'T'],
+    [16, [0,1,2,4,5,6,8,9], 'O'],
+    [15, [0,1,3,4,6,7,8,9], 'I'],
+    [14, [0,1,2,4,5,7,8,9], 'J'],
+  ]);
+
+  T.setCur({ type: 'T', rot: 1, x: 3, y: 9 });
+  T.layout();
+  T.render();
+  T.drawPreviews();
+
+  const doc = win.document;
+  doc.getElementById('stat-score').textContent = '12,400';
+  doc.getElementById('stat-level').textContent = '3';
+  doc.getElementById('stat-lines').textContent = '22';
+  const toast = doc.getElementById('toast');
+  toast.textContent = 'T-Spin Double';
+  toast.classList.add('show');
+});
+</script>
+</head>
+<body></body>
+</html>

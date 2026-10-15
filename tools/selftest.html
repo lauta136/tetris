@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>selftest</title>
+<link rel="stylesheet" href="../style.css">
+<script type="module">
+/* Self-test harness for tetris.js. Not part of the app; run it with:
+     python3 -m http.server 8000
+     "Google Chrome" --headless=new --dump-dom --virtual-time-budget=15000 \
+        --window-size=390,844 "http://localhost:8000/tools/selftest.html?debug=1"
+*/
+const errors = [];
+window.addEventListener('error', (e) => errors.push('error: ' + (e.message || e)));
+window.addEventListener('unhandledrejection', (e) => errors.push('rejection: ' + e.reason));
+
+let pass = 0, fail = 0;
+const lines = [];
+const ok = (name, cond, extra) => {
+  if (cond) { pass++; lines.push('  PASS  ' + name); }
+  else { fail++; lines.push('  FAIL  ' + name + (extra !== undefined ? '   [' + extra + ']' : '')); }
+};
+const eq = (name, got, want) => ok(name, got === want, 'got ' + JSON.stringify(got) + ', want ' + JSON.stringify(want));
+
+/* boot the app using the real index.html markup */
+const bodyTag = 'bo' + 'dy';
+const html = await fetch('../index.html').then((r) => r.text());
+const body = html.match(new RegExp('<' + bodyTag + '>([\\s\\S]*?)</' + bodyTag + '>'))[1]
+  .replace(/<script[\s\S]*?<\/script>/g, '');
+document.body.innerHTML = body;
+
+await import('../tetris.js');
+
+const T = window.__tetris;
+const emptyBoard = () => Array.from({ length: T.TOTAL_ROWS }, () => new Array(T.COLS).fill(0));
+const filled = (row) => row.filter((c) => c).length;
+
+try {
+
+/* ---------------------------------------------------------------- boot */
+ok('debug hook present', !!T);
+ok('starts on the title screen', document.getElementById('overlay').className !== 'hidden');
+eq('overlay title', document.getElementById('overlay-title').textContent, 'Tetris');
+eq('initial state', T.state, 'ready');
+
+const field = document.getElementById('field');
+ok('field canvas sized', field.width > 0 && field.height > 0);
+ok('field canvas is 1:2', Math.abs(field.width / field.height - 0.5) < 0.02,
+   field.width + 'x' + field.height);
+
+/* ---------------------------------------------------------------- start */
+T.start();
+eq('state after start', T.state, 'playing');
+ok('overlay hidden after start', document.getElementById('overlay').className.includes('hidden'));
+ok('a piece spawned', !!T.cur);
+eq('queue holds 3', T.queue.length, 3);
+
+/* ---------------------------------------------------------------- 7-bag */
+T.resetGame();
+T.start();
+const counts = {};
+T.TYPES.forEach((t) => { counts[t] = 0; });
+for (let i = 0; i < 70; i++) {
+  counts[T.cur.type]++;
+  T.setBoard(emptyBoard());
+  T.spawn();
+}
+const bagOk = T.TYPES.every((t) => counts[t] === 10);
+ok('7-bag: 70 draws give 10 of each piece', bagOk, JSON.stringify(counts));
+
+/* ---------------------------------------------------------------- line clear */
+T.resetGame();
+T.start();
+let b = emptyBoard();
+for (let c = 0; c < T.COLS; c++) if (c !== 4) b[21][c] = 'I';
+T.setBoard(b);
+let s0 = T.score;
+T.setCur({ type: 'I', rot: 1, x: 2, y: 18 });   // vertical I sitting in column 4
+T.hardDrop();
+eq('single line scores 100', T.score - s0, 100);
+eq('enters clearing phase', T.phase, 'clearing');
+const boardBlocks = (bd) => bd.reduce((n, row) => n + filled(row), 0);
+eq('before clear: 9 + 4 blocks', boardBlocks(T.board), 13);
+T.step(300);
+eq('after clear: row 21 gone, 3 blocks survive', boardBlocks(T.board), 3);
+eq('shifted column survives', T.board[21][4], 'I');
+
+/* ---------------------------------------------------------------- tetris + b2b + combo */
+T.resetGame();
+T.start();
+const fourRows = () => {
+  const x = emptyBoard();
+  for (let r = 18; r <= 21; r++) for (let c = 0; c < T.COLS; c++) if (c !== 4) x[r][c] = 'I';
+  x[2][0] = 'J';                                 // a stray block, so this is NOT a perfect clear
+  return x;
+};
+T.setBoard(fourRows());
+s0 = T.score;
+T.setCur({ type: 'I', rot: 1, x: 2, y: 18 });
+T.hardDrop();
+eq('tetris scores 800', T.score - s0, 800);
+eq('b2b armed', T.b2b, true);
+T.step(300);
+
+T.setBoard(fourRows());
+s0 = T.score;
+T.setCur({ type: 'I', rot: 1, x: 2, y: 18 });
+T.hardDrop();
+eq('b2b tetris scores 1200 + 50 combo', T.score - s0, 1250);
+
+/* ---------------------------------------------------------------- perfect clear */
+T.resetGame();
+T.start();
+b = emptyBoard();
+for (let c = 0; c < 6; c++) b[21][c] = 'I';      // 6 filled, columns 6-9 open
+T.setBoard(b);
+s0 = T.score;
+T.setCur({ type: 'I', rot: 0, x: 6, y: 20 });    // horizontal I completes the row
+T.hardDrop();
+eq('perfect clear adds 800', T.score - s0, 100 + 800);
+
+/* ---------------------------------------------------------------- t-spins */
+T.resetGame();
+b = emptyBoard();
+b[19][3] = 'I'; b[19][5] = 'I'; b[21][3] = 'I'; b[21][5] = 'I';
+T.setBoard(b);
+T.setCur({ type: 'T', rot: 2, x: 3, y: 19 });
+T.setLastAction('rotate');
+T.setLastKick(0);
+eq('full t-spin (both front corners)', T.detectTSpin(), 2);
+
+b = emptyBoard();
+b[19][3] = 'I'; b[19][5] = 'I'; b[21][3] = 'I';
+T.setBoard(b);
+T.setCur({ type: 'T', rot: 2, x: 3, y: 19 });
+eq('mini t-spin (one front corner)', T.detectTSpin(), 1);
+
+T.setLastAction('move');
+eq('no t-spin without a rotation', T.detectTSpin(), 0);
+
+T.setLastAction('rotate');
+b = emptyBoard();
+b[19][3] = 'I'; b[19][5] = 'I';
+T.setBoard(b);
+eq('no t-spin with only two corners', T.detectTSpin(), 0);
+
+T.setLastKick(4);
+b = emptyBoard();
+b[19][3] = 'I'; b[19][5] = 'I'; b[21][3] = 'I';
+T.setBoard(b);
+eq('final-kick promotes to full t-spin', T.detectTSpin(), 2);
+
+/* ---------------------------------------------------------------- wall kick */
+T.resetGame();
+T.setBoard(emptyBoard());
+T.setCur({ type: 'I', rot: 1, x: -2, y: 5 });       // vertical I hugging the left wall
+const rotated = T.tryRotate(1);
+ok('rotation against the wall kicks', rotated === true);
+eq('kick landed at x=0', T.cur.x, 0);
+eq('kick landed in rot 2', T.cur.rot, 2);
+eq('kick kept y', T.cur.y, 5);
+
+T.setBoard(emptyBoard());
+T.setCur({ type: 'T', rot: 0, x: 3, y: 19 });
+for (let r = 0; r < T.TOTAL_ROWS; r++) for (let c = 0; c < T.COLS; c++) T.board[r][c] = 'J';
+[[4,19],[3,20],[4,20],[5,20]].forEach(([c, r]) => { T.board[r][c] = 0; });   // carve out the T
+const blocked = T.tryRotate(1);
+ok('rotation fails when every kick is blocked', blocked === false);
+
+/* ---------------------------------------------------------------- hold */
+T.resetGame();
+T.start();
+T.setBoard(emptyBoard());
+const firstType = T.cur.type;
+T.doHold();
+eq('hold stores the first piece', T.hold, firstType);
+eq('hold marks the slot used', T.holdUsed, true);
+const swapped = T.cur.type;
+T.doHold();
+eq('hold is once per drop', T.cur.type, swapped);
+T.setBoard(emptyBoard());
+T.hardDrop();
+eq('hold re-arms after a lock', T.holdUsed, false);
+T.doHold();
+eq('hold swaps the piece back', T.cur.type, firstType);
+
+/* ---------------------------------------------------------------- hard drop points */
+T.resetGame();
+T.start();
+T.setBoard(emptyBoard());
+s0 = T.score;
+T.setCur({ type: 'O', rot: 0, x: 4, y: 1 });
+T.hardDrop();
+eq('hard drop awards 2 per cell', T.score - s0, 38);   // 19 cells
+
+/* ---------------------------------------------------------------- lock delay */
+T.resetGame();
+T.start();
+T.setBoard(emptyBoard());
+T.setCur({ type: 'O', rot: 0, x: 4, y: 20 });
+for (let i = 0; i < 100; i++) T.step(10);              // let gravity register it as grounded
+ok('piece is grounded', T.grounded === true);
+for (let i = 0; i < 20; i++) T.tryShift(i % 2 === 0 ? -1 : 1, 0);
+eq('lock-delay resets capped at 15', T.lockResets, 15);
+
+/* ---------------------------------------------------------------- top out */
+T.resetGame();
+T.start();
+b = emptyBoard();
+for (let r = 2; r < T.TOTAL_ROWS; r++) for (let c = 0; c < T.COLS; c++) b[r][c] = 'I';
+T.setBoard(b);
+T.spawn();
+eq('stacking to the ceiling ends the game', T.state, 'over');
+
+/* ---------------------------------------------------------------- rendering */
+T.resetGame();
+T.start();
+b = emptyBoard();
+for (let r = 16; r < T.TOTAL_ROWS; r++) for (let c = 0; c < T.COLS; c++) b[r][c] = 'T';
+T.setBoard(b);
+T.setCur({ type: 'L', rot: 0, x: 3, y: 6 });
+T.render();
+T.drawPreviews();
+
+const g = field.getContext('2d');
+const data = g.getImageData(0, 0, field.width, field.height).data;
+let opaque = 0;
+for (let i = 3; i < data.length; i += 4) if (data[i] > 0) opaque++;
+ok('playfield renders pixels', opaque > 5000, opaque + ' opaque pixels');
+
+const holdCv = document.getElementById('hold');
+const nextCv = document.getElementById('next');
+ok('preview canvases sized', holdCv.width > 0 && nextCv.width > 0);
+
+/* ---------------------------------------------------------------- buttons */
+T.resetGame();
+T.start();
+const buttons = [...document.querySelectorAll('.btn')];
+eq('seven control buttons', buttons.length, 7);
+ok('all buttons labelled', buttons.every((el) => el.dataset.act));
+
+/* tap a few buttons through real pointer events */
+const tap = (el) => {
+  const opts = { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: 200, clientY: 700 };
+  el.dispatchEvent(new PointerEvent('pointerdown', opts));
+  el.dispatchEvent(new PointerEvent('pointerup', opts));
+};
+T.setBoard(emptyBoard());
+tap(buttons.find((el) => el.dataset.act === 'rotcw'));
+tap(buttons.find((el) => el.dataset.act === 'left'));
+tap(buttons.find((el) => el.dataset.act === 'right'));
+tap(buttons.find((el) => el.dataset.act === 'harddrop'));
+ok('buttons do not throw', true);
+
+document.getElementById('btn-pause').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+eq('pause button pauses', T.state, 'paused');
+document.getElementById('btn-pause').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+eq('pause button resumes', T.state, 'playing');
+
+/* ---------------------------------------------------------------- errors */
+ok('no uncaught errors', errors.length === 0, errors.join(' | '));
+
+} catch (e) {
+  errors.push('THROWN: ' + ((e && e.stack) || String(e)));
+  ok('test harness ran to completion', false, String(e));
+}
+
+/* ---------------------------------------------------------------- report */
+const summary = (fail === 0 ? 'ALL PASS' : 'FAILURES') + ': ' + pass + ' passed, ' + fail + ' failed';
+lines.forEach((l) => console.log('__T|' + l));
+console.log('__T|' + summary);
+if (errors.length) console.log('__T|ERRORS: ' + errors.join(' | '));
+document.body.innerHTML = '<pre id="result">' + summary + '\n' + lines.join('\n') + '</pre>';
+document.title = summary;
+</script>
+</head>
+<body></body>
+</html>

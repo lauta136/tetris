@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<title>Tetris</title>
+<meta name="description" content="Modern Tetris. A small, dependency-free progressive web app that plays offline.">
+<meta name="theme-color" content="#0f1115">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tetris">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <header id="hud">
+    <div class="stat"><span class="label">Score</span><span class="value" id="stat-score">0</span></div>
+    <div class="stat"><span class="label">Level</span><span class="value" id="stat-level">1</span></div>
+    <div class="stat"><span class="label">Lines</span><span class="value" id="stat-lines">0</span></div>
+    <div class="hud-buttons">
+      <button class="icon-btn" id="btn-sound" aria-label="Toggle sound">
+        <span class="glyph" id="sound-glyph">♪</span>
+      </button>
+      <button class="icon-btn" id="btn-pause" aria-label="Pause">
+        <span class="bars" aria-hidden="true"><i></i><i></i></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <aside class="gutter" id="gutter-left">
+      <section class="panel panel-hold">
+        <span class="label">Hold</span>
+        <canvas id="hold"></canvas>
+      </section>
+    </aside>
+
+    <div id="field-wrap">
+      <canvas id="field"></canvas>
+      <div id="toast" aria-live="polite"></div>
+      <div id="overlay">
+        <div class="overlay-card">
+          <h1 id="overlay-title">Tetris</h1>
+          <p id="overlay-sub">Tap to start</p>
+          <p id="overlay-best" class="muted"></p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="gutter" id="gutter-right">
+      <section class="panel panel-next">
+        <span class="label">Next</span>
+        <canvas id="next"></canvas>
+      </section>
+    </aside>
+  </main>
+
+  <footer id="controls">
+    <button class="btn" data-act="left"   aria-label="Move left"><span class="glyph">◀</span><span class="cap">Left</span></button>
+    <button class="btn" data-act="right"  aria-label="Move right"><span class="glyph">▶</span><span class="cap">Right</span></button>
+    <button class="btn" data-act="rotccw" aria-label="Rotate counter-clockwise"><span class="glyph">↺</span><span class="cap">CCW</span></button>
+    <button class="btn" data-act="rotcw"  aria-label="Rotate clockwise"><span class="glyph">↻</span><span class="cap">CW</span></button>
+
+    <button class="btn" data-act="softdrop" aria-label="Soft drop"><span class="glyph">▼</span><span class="cap">Soft</span></button>
+    <button class="btn" data-act="harddrop" aria-label="Hard drop"><span class="glyph glyph-drop">▼</span><span class="cap">Hard</span></button>
+    <button class="btn btn-wide" data-act="hold" aria-label="Hold piece"><span class="txt">Hold</span></button>
+  </footer>
+
+</div>
+
+<script type="module" src="tetris.js"></script>
+</body>
+</html>
