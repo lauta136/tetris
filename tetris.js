@@ -135,6 +135,8 @@ let lastAction = 'spawn';       // spawn | move | rotate
 let lastKick = -1;
 
 let bestScore = 0;
+let bestAtStart = 0;       // the record held when this run began
+let bestBeaten = false;    // warn only once per run
 let muted = false;
 
 const L = { cell: 24, dpr: 1 };
@@ -400,10 +402,13 @@ function finishClear() {
   const rows = clearing.rows;
   clearing = null;
   rows.sort((a, b) => a - b);
-  for (let i = rows.length - 1; i >= 0; i--) {
-    board.splice(rows[i], 1);
-    board.unshift(new Array(COLS).fill(0));
-  }
+
+  // Remove every full row first, THEN insert the replacements. Doing both in the
+  // same descending loop would re-index the board on each unshift and delete the
+  // wrong rows.
+  for (let i = rows.length - 1; i >= 0; i--) board.splice(rows[i], 1);
+  for (let i = 0; i < rows.length; i++) board.unshift(new Array(COLS).fill(0));
+
   beep(rows.length === 4 ? 'tetris' : 'clear');
   phase = 'playing';
   spawn();
@@ -633,6 +638,25 @@ function updateHUD() {
   setText(els.statScore, fmt(score));
   setText(els.statLevel, String(level));
   setText(els.statLines, String(linesCleared));
+
+  // Warn the instant the run overtakes the previous record, then keep the score
+  // highlighted for the rest of the run. In-memory only; persistence happens on
+  // pause and game over so we are not hammering localStorage every frame.
+  if (!bestBeaten && bestAtStart > 0 && score > bestAtStart) {
+    bestBeaten = true;
+    els.statScore.classList.add('best');
+    flashBest();
+    beep('best');
+    saveBest();
+  }
+  if (score > bestScore) bestScore = score;
+}
+
+let bestTimer = 0;
+function flashBest() {
+  els.bestBadge.classList.add('show');
+  clearTimeout(bestTimer);
+  bestTimer = setTimeout(function () { els.bestBadge.classList.remove('show'); }, 2800);
 }
 
 let toastTimer = 0;
@@ -723,6 +747,7 @@ const TONES = {
   clear:  [660, 0.110, 'sine',     0.065],
   tetris: [880, 0.190, 'sine',     0.080],
   hold:   [440, 0.050, 'sine',     0.045],
+  best:   [988, 0.150, 'sine',     0.070],
   over:   [90,  0.480, 'sawtooth', 0.080],
 };
 
@@ -775,6 +800,12 @@ function resetGame() {
   clearing = null;
   phase = 'playing';
 
+  bestAtStart = bestScore;
+  bestBeaten = false;
+  els.statScore.classList.remove('best');
+  clearTimeout(bestTimer);
+  els.bestBadge.classList.remove('show');
+
   refillQueue();
   updateHUD();
   drawPreviews();
@@ -808,6 +839,7 @@ function pause() {
   softDropping = false;
   stopRepeat('left');
   stopRepeat('right');
+  saveBest();
   showOverlay('Paused', 'Tap to resume');
 }
 
@@ -826,8 +858,8 @@ function gameOver() {
   stopRepeat('left');
   stopRepeat('right');
 
-  const isBest = score > bestScore;
-  if (isBest) bestScore = score;
+  const isBest = score > bestAtStart;
+  if (score > bestScore) bestScore = score;
   saveBest();
   beep('over');
 
@@ -1052,6 +1084,7 @@ function cacheEls() {
   els.overlaySub = byId('overlay-sub');
   els.overlayBest = byId('overlay-best');
   els.toast = byId('toast');
+  els.bestBadge = byId('best-badge');
   els.statScore = byId('stat-score');
   els.statLevel = byId('stat-level');
   els.statLines = byId('stat-lines');
@@ -1113,7 +1146,7 @@ if (new URLSearchParams(location.search).has('debug')) {
     tryShift: tryShift, tryRotate: tryRotate, ghostY: ghostY,
     lockPiece: lockPiece, detectTSpin: detectTSpin, step: step,
     render: render, drawPreviews: drawPreviews, layout: layout,
-    resetGame: resetGame, nextFromBag: nextFromBag,
+    resetGame: resetGame, nextFromBag: nextFromBag, updateHUD: updateHUD,
 
     get board() { return board; },
     get cur() { return cur; },
@@ -1131,6 +1164,9 @@ if (new URLSearchParams(location.search).has('debug')) {
     get lockResets() { return lockResets; },
     get grounded() { return grounded; },
     get lockTimer() { return lockTimer; },
+    get best() { return bestScore; },
+    get bestAtStart() { return bestAtStart; },
+    get bestBeaten() { return bestBeaten; },
 
     setBoard: function (b) { board = b; },
     setCur: function (c) { cur = c; },
@@ -1138,6 +1174,7 @@ if (new URLSearchParams(location.search).has('debug')) {
     setLastKick: function (k) { lastKick = k; },
     setPhase: function (p) { phase = p; },
     setScore: function (n) { score = n; },
+    setBest: function (n) { bestScore = n; },
   };
 }
 

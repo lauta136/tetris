@@ -52,8 +52,10 @@ f.addEventListener('load', () => {
 
   const doc = win.document;
   doc.getElementById('stat-score').textContent = '12,400';
+  doc.getElementById('stat-score').classList.add('best');
   doc.getElementById('stat-level').textContent = '3';
   doc.getElementById('stat-lines').textContent = '22';
+  doc.getElementById('best-badge').classList.add('show');
   const toast = doc.getElementById('toast');
   toast.textContent = 'T-Spin Double';
   toast.classList.add('show');

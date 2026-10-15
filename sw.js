@@ -2,7 +2,7 @@
    Cache-first for everything the app needs, network fallback, and a
    cache-first navigation handler so the game opens with no connection. */
 
-const CACHE = 'tetris-v1';
+const CACHE = 'tetris-v2';
 
 const ASSETS = [
   './',

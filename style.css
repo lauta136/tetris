@@ -101,6 +101,19 @@ button {
   letter-spacing: -0.01em;
 }
 
+/* score stays highlighted once the run has beaten the previous record */
+.stat .value.best {
+  color: var(--accent);
+  transform-origin: left center;
+  animation: bestPop 560ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 1;
+}
+
+@keyframes bestPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
 .hud-buttons {
   display: flex;
   gap: 6px;
@@ -218,6 +231,32 @@ button {
   transform: translateY(0) scale(1);
 }
 
+/* "New Best" pill, flashed once per run when the record is overtaken. Sits
+   higher than #toast so the two never overlap. */
+#best-badge {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #06231f;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -6px) scale(0.94);
+  transition: opacity 260ms ease, transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  box-shadow: 0 8px 22px -8px rgba(79, 209, 197, 0.9);
+}
+#best-badge.show {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
 /* ------------------------------------------------------------------ overlay */
 #overlay {
   position: absolute;
@@ -294,14 +333,17 @@ button {
   text-transform: uppercase;
 }
 
-/* hard-drop glyph gets an underline bar so it reads differently from soft drop */
-.glyph-drop { position: relative; }
-.glyph-drop::after {
-  content: "";
-  position: absolute;
-  left: -3px;
-  right: -3px;
-  bottom: -5px;
+/* Hard-drop glyph: the bar is part of the flow, stacked under the triangle, so it
+   can never collide with the caption below. */
+.glyph-drop {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.glyph-drop i {
+  display: block;
+  width: 13px;
   height: 2px;
   border-radius: 1px;
   background: currentColor;

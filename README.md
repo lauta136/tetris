@@ -51,6 +51,9 @@ Soft  Hard
 No haptics: iOS Safari does not expose the Vibration API, so buttons give
 visual press feedback instead.
 
+Passing your previous record flashes a **New Best** pill and turns the score
+teal for the rest of the run.
+
 ## Run locally
 
 The service worker needs a secure context, so `file://` will not register it.

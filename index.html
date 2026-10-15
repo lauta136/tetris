@@ -45,6 +45,7 @@
     <div id="field-wrap">
       <canvas id="field"></canvas>
       <div id="toast" aria-live="polite"></div>
+      <div id="best-badge" aria-live="polite">New Best</div>
       <div id="overlay">
         <div class="overlay-card">
           <h1 id="overlay-title">Tetris</h1>
@@ -69,7 +70,7 @@
     <button class="btn" data-act="rotcw"  aria-label="Rotate clockwise"><span class="glyph">↻</span><span class="cap">CW</span></button>
 
     <button class="btn" data-act="softdrop" aria-label="Soft drop"><span class="glyph">▼</span><span class="cap">Soft</span></button>
-    <button class="btn" data-act="harddrop" aria-label="Hard drop"><span class="glyph glyph-drop">▼</span><span class="cap">Hard</span></button>
+    <button class="btn" data-act="harddrop" aria-label="Hard drop"><span class="glyph glyph-drop">▼<i></i></span><span class="cap">Hard</span></button>
     <button class="btn btn-wide" data-act="hold" aria-label="Hold piece"><span class="txt">Hold</span></button>
   </footer>
 

@@ -120,6 +120,41 @@ T.setCur({ type: 'I', rot: 0, x: 6, y: 20 });    // horizontal I completes the r
 T.hardDrop();
 eq('perfect clear adds 800', T.score - s0, 100 + 800);
 
+/* ---------------------------------------------------------------- multi-row removal
+   Regression: splice() and unshift() in the same descending loop re-index the
+   board, so a Tetris used to leave one full row behind (which then scored again
+   on the next placement). */
+T.resetGame();
+T.start();
+b = emptyBoard();
+for (let r = 18; r <= 21; r++) for (let c = 0; c < T.COLS; c++) if (c !== 4) b[r][c] = 'I';
+b[2][0] = 'J';                                   // a lone marker above the stack
+T.setBoard(b);
+T.setCur({ type: 'I', rot: 1, x: 2, y: 18 });
+T.hardDrop();
+T.step(300);
+eq('tetris clears all four rows', boardBlocks(T.board), 1);
+eq('only the marker survives', T.board[6][0], 'J');
+ok('no full row is left behind', T.board.every((row) => row.some((c) => !c)),
+   JSON.stringify(T.board.map((r) => filled(r))));
+
+/* a double must also remove both rows exactly */
+T.resetGame();
+T.start();
+b = emptyBoard();
+for (let r = 20; r <= 21; r++) for (let c = 0; c < T.COLS; c++) if (c !== 4) b[r][c] = 'I';
+b[2][0] = 'J';
+T.setBoard(b);
+T.setCur({ type: 'I', rot: 1, x: 2, y: 18 });
+T.hardDrop();
+T.step(300);
+// The I also deposits cells in rows 18/19, which shift down as the two rows go.
+eq('double clears both rows', boardBlocks(T.board), 3);
+eq('marker shifted down two rows', T.board[4][0], 'J');
+eq('I column shifted down two rows', T.board[20][4], 'I');
+eq('I column shifted down two rows (2)', T.board[21][4], 'I');
+ok('no full row is left behind after a double', T.board.every((row) => row.some((c) => !c)));
+
 /* ---------------------------------------------------------------- t-spins */
 T.resetGame();
 b = emptyBoard();
@@ -212,6 +247,43 @@ for (let r = 2; r < T.TOTAL_ROWS; r++) for (let c = 0; c < T.COLS; c++) b[r][c] 
 T.setBoard(b);
 T.spawn();
 eq('stacking to the ceiling ends the game', T.state, 'over');
+
+/* ---------------------------------------------------------------- new best warning */
+T.resetGame();
+T.setBest(5000);
+T.start();
+const scoreEl = document.getElementById('stat-score');
+const badgeEl = document.getElementById('best-badge');
+eq('record carried into the run', T.bestAtStart, 5000);
+eq('not beaten at the start', T.bestBeaten, false);
+ok('score not yet highlighted', !scoreEl.classList.contains('best'));
+
+T.setScore(4999);
+T.updateHUD();
+eq('no warning below the record', T.bestBeaten, false);
+ok('still not highlighted', !scoreEl.classList.contains('best'));
+
+T.setScore(5001);
+T.updateHUD();
+eq('warning fires when the record is passed', T.bestBeaten, true);
+ok('score is highlighted', scoreEl.classList.contains('best'));
+ok('badge is shown', badgeEl.classList.contains('show'));
+eq('record is updated', T.best, 5001);
+
+T.setScore(9000);
+T.updateHUD();
+eq('warning stays a single event', T.bestBeaten, true);
+
+T.resetGame();
+ok('reset clears the highlight', !scoreEl.classList.contains('best'));
+ok('reset hides the badge', !badgeEl.classList.contains('show'));
+
+/* a first-ever run (no record) must not spam the warning */
+T.setBest(0);
+T.start();
+T.setScore(50);
+T.updateHUD();
+eq('no warning when there is no record to beat', T.bestBeaten, false);
 
 /* ---------------------------------------------------------------- rendering */
 T.resetGame();
